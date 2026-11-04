@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MURAL Interactivo | Dinámica: El Bote de los 100 Kilos - Red Link</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Caveat (para estilo post-it) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            hand: ['Caveat', 'cursive'],
+          },
+          colors: {
+            muralbg: '#1e2029',
+            muralgrid: '#2b2e3b',
+            postitYellow: '#fef08a',
+            postitGreen: '#bbf7d0',
+            postitBlue: '#bae6fd',
+            postitPurple: '#e9d5ff',
+            postitRed: '#fecaca',
+            linkRed: '#E30613',
+            linkDark: '#0B132B'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Fondo estilo canvas con cuadrícula de puntos MURAL */
+    .mural-canvas {
+      background-color: #1a1c24;
+      background-image: radial-gradient(#333748 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+
+    /* Efectos de post-it realista */
+    .sticky-card {
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
+      cursor: grab;
+      user-select: none;
+    }
+    .sticky-card:active {
+      cursor: grabbing;
+      transform: scale(1.04) rotate(1deg);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.5);
+      z-index: 50;
+    }
+    .sticky-card:hover {
+      transform: translateY(-3px) rotate(-0.5deg);
+    }
+
+    .drop-zone {
+      transition: all 0.25s ease;
+    }
+    .drop-zone.drag-over {
+      background-color: rgba(59, 130, 246, 0.15);
+      border-color: #60a5fa !important;
+      transform: scale(1.005);
+    }
+
+    /* Animación de alerta */
+    @keyframes pulse-red {
+      0%, 100% { border-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+      50% { border-color: #b91c1c; box-shadow: 0 0 30px rgba(239, 68, 68, 0.9); }
+    }
+    .overload-glow {
+      animation: pulse-red 1.2s infinite;
+    }
+  </style>
+</head>
+<body class="mural-canvas text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
+
+  <!-- TOP BAR: Control del Facilitador y Temporizador -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-700/80 px-6 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 shadow-xl">
+    <div class="flex items-center gap-3">
+      <div class="bg-red-600 text-white font-black px-2.5 py-1 rounded text-sm tracking-wider uppercase">RED LINK</div>
+      <div class="h-6 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-2">
+        <i data-lucide="layout" class="w-5 h-5 text-blue-400"></i>
+        <h1 class="text-base font-bold text-white tracking-wide">MURAL WORKSHOP: <span class="text-blue-400 font-extrabold">El Bote de los 100 Kilos</span></h1>
+      </div>
+    </div>
+
+    <!-- Selector de Equipos / Mesas -->
+    <div class="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700">
+      <span class="text-xs text-slate-400 font-bold px-3 uppercase tracking-wider flex items-center gap-1.5">
+        <i data-lucide="users" class="w-3.5 h-3.5"></i> Mesas:
+      </span>
+      <button onclick="switchTeam('mesa1')" id="tab-mesa1" class="team-tab px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white shadow-md">Mesa 1</button>
+      <button onclick="switchTeam('mesa2')" id="tab-mesa2" class="team-tab px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">Mesa 2</button>
+      <button onclick="switchTeam('mesa3')" id="tab-mesa3" class="team-tab px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">Mesa 3</button>
+      <button onclick="switchTeam('mesa4')" id="tab-mesa4" class="team-tab px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">Mesa 4</button>
+    </div>
+
+    <!-- Timer & Facilitator Controls -->
+    <div class="flex items-center gap-3">
+      <!-- Countdown Widget -->
+      <div class="flex items-center gap-2 bg-slate-950 px-3.5 py-1.5 rounded-lg border border-slate-800">
+        <i data-lucide="timer" class="w-4 h-4 text-amber-400 animate-pulse"></i>
+        <span id="timer-display" class="font-mono text-base font-black text-amber-300">07:00</span>
+        <button onclick="toggleTimer()" id="timer-btn" class="text-slate-400 hover:text-white ml-1 p-1 hover:bg-slate-800 rounded">
+          <i data-lucide="play" id="timer-icon" class="w-3.5 h-3.5"></i>
+        </button>
+        <button onclick="resetTimer()" class="text-slate-500 hover:text-slate-300 p-1 hover:bg-slate-800 rounded" title="Reiniciar">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+      <!-- Facilitator Trigger Crisis -->
+      <button onclick="triggerCrisisModal()" class="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-lg hover:shadow-red-500/20 transition-all border border-red-500/30">
+        <i data-lucide="zap" class="w-4 h-4"></i>
+        <span>🚨 Desatar Crisis (+15 kg)</span>
+      </button>
+
+      <!-- Debrief Modal Trigger -->
+      <button onclick="openDebriefModal()" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-lg border border-slate-600 transition-all">
+        <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+        <span>Conexión Link</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE PRINCIPAL -->
+  <main class="flex-1 p-6 max-w-[1700px] w-full mx-auto flex flex-col gap-6">
+
+    <!-- BANNER DE CONSIGNAS DE LA DINÁMICA -->
+    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-5 shadow-2xl flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-2xl">
+          🏝️
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-bold text-white tracking-wide">Misión: <span id="current-team-title" class="text-blue-400">Mesa 1</span> en la Isla Paradisiaca</h2>
+            <span class="bg-blue-500/20 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Desafío Colaborativo</span>
+          </div>
+          <p class="text-xs text-slate-300 mt-0.5">
+            Tienen <strong class="text-amber-400 font-bold">175 kg</strong> de equipaje en la playa. La capacidad máxima e innegociable del bote de rescate es de <strong class="text-emerald-400 font-bold">100 kg</strong>. ¡Arrastren o hagan clic en los post-its para decidir qué sube y qué se queda!
+          </p>
+        </div>
+      </div>
+
+      <!-- HUD DEL PESO EN VIVO -->
+      <div id="boat-hud-card" class="bg-slate-950/90 border-2 border-emerald-500/50 rounded-xl px-5 py-3 flex items-center gap-6 shadow-inner transition-all">
+        <div>
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+            <i data-lucide="anchor" class="w-3.5 h-3.5 text-blue-400"></i> Carga en el Bote:
+          </div>
+          <div class="flex items-baseline gap-1.5 mt-0.5">
+            <span id="current-weight" class="text-3xl font-black text-emerald-400 font-mono tracking-tight">0</span>
+            <span class="text-sm font-bold text-slate-400 font-mono">/ 100 kg</span>
+          </div>
+        </div>
+
+        <!-- Barra de Progreso Visual de Capacidad -->
+        <div class="w-44 flex flex-col gap-1.5">
+          <div class="flex justify-between text-[10px] font-bold">
+            <span id="weight-status-label" class="text-slate-400">Capacidad Libre</span>
+            <span id="weight-percentage" class="text-emerald-400 font-mono">0%</span>
+          </div>
+          <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
+            <div id="weight-progress-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRID DE TRABAJO TIPO TABLERO MURAL: PLAYA (IZQ) vs BOTE (DER) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[580px]">
+
+      <!-- COLUMNA IZQUIERDA: LA PLAYA (Objetos disponibles - 175 kg total) -->
+      <section class="lg:col-span-5 bg-slate-900/60 backdrop-blur border-2 border-dashed border-amber-500/40 rounded-2xl p-5 flex flex-col shadow-xl drop-zone" 
+               id="beach-zone" 
+               ondragover="handleDragOver(event)" 
+               ondragleave="handleDragLeave(event)" 
+               ondrop="handleDrop(event, 'beach')">
+        
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🏖️</span>
+            <div>
+              <h3 class="text-sm font-black text-amber-300 uppercase tracking-wider">En la Playa (Se quedan en tierra)</h3>
+              <p class="text-[11px] text-slate-400">Cosas que no entran o que decidieron resignar.</p>
+            </div>
+          </div>
+          <span id="beach-weight-pill" class="bg-amber-950/80 text-amber-300 border border-amber-600/50 text-xs font-mono font-bold px-2.5 py-1 rounded-lg">
+            175 kg aquí
+          </span>
+        </div>
+
+        <!-- Contenedor de Post-its en la Playa -->
+        <div id="beach-cards-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-4 flex-1 content-start overflow-y-auto max-h-[580px] p-1">
+          <!-- Se inyectan dinámicamente según la mesa seleccionada -->
+        </div>
+      </section>
+
+      <!-- FLECHAS / INDICADOR CENTRAL DE TRASLADO -->
+      <div class="lg:col-span-1 hidden lg:flex flex-col items-center justify-center gap-3 text-slate-600">
+        <div class="h-full w-px bg-slate-800"></div>
+        <div class="bg-slate-800 p-2.5 rounded-full border border-slate-700 text-blue-400 shadow-lg">
+          <i data-lucide="arrow-left-right" class="w-5 h-5"></i>
+        </div>
+        <div class="text-[10px] uppercase font-black tracking-widest text-slate-500 [writing-mode:vertical-lr] rotate-180">
+          DECISIÓN DE CAPACIDAD
+        </div>
+        <div class="h-full w-px bg-slate-800"></div>
+      </div>
+
+      <!-- COLUMNA DERECHA: EL BOTE DE SALVAMENTO (Capacidad fija: 100 kg) -->
+      <section class="lg:col-span-6 bg-slate-900/80 backdrop-blur border-2 border-dashed border-blue-500/50 rounded-2xl p-5 flex flex-col shadow-2xl drop-zone relative"
+               id="boat-zone" 
+               ondragover="handleDragOver(event)" 
+               ondragleave="handleDragLeave(event)" 
+               ondrop="handleDrop(event, 'boat')">
+        
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">⛵</span>
+            <div>
+              <h3 class="text-sm font-black text-blue-300 uppercase tracking-wider flex items-center gap-2">
+                Bodega del Bote de Salvamento
+                <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono font-bold">LÍMITE: 100 KG</span>
+              </h3>
+              <p class="text-[11px] text-slate-400">Solo lo que suban acá llegará con vida y a salvo al continente.</p>
+            </div>
+          </div>
+          
+          <button onclick="clearBoat()" class="text-[11px] text-slate-400 hover:text-red-400 flex items-center gap-1 hover:bg-slate-800 px-2 py-1 rounded transition">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Vaciar Bote
+          </button>
+        </div>
+
+        <!-- Contenedor de Post-its en el Bote -->
+        <div id="boat-cards-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-4 flex-1 content-start overflow-y-auto max-h-[580px] p-1 border-2 border-dashed border-slate-800/80 rounded-xl bg-slate-950/40 min-h-[300px]">
+          <!-- Se inyectan dinámicamente -->
+        </div>
+
+        <!-- Banner de Feedback Flotante cuando está sobrecargado o equilibrado -->
+        <div id="boat-alert-banner" class="mt-4 p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all bg-slate-950 border-slate-800 text-slate-400">
+          <div class="flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+            <span id="boat-alert-text">Arrastren los bultos hasta completar exactamente los 100 kg.</span>
+          </div>
+          <span id="boat-alert-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">ESTADO: EN ESPERA</span>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- REFERENCIAS Y LEYENDA PEDAGÓGICA -->
+    <footer class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
+      <div class="flex items-center gap-6">
+        <span class="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Tipos de Post-its:</span>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-emerald-300"></span> <span class="text-slate-300 font-semibold">Vitales (Supervivencia)</span></div>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-amber-300"></span> <span class="text-slate-300 font-semibold">Reglamentarios (Prefectura)</span></div>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-sky-300"></span> <span class="text-slate-300 font-semibold">Aceleración (Futuro)</span></div>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-purple-300"></span> <span class="text-slate-300 font-semibold">Confort / Deseos</span></div>
+      </div>
+      <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+        <i data-lucide="mouse-pointer" class="w-3.5 h-3.5 text-blue-400"></i>
+        <span>Hagan <strong>clic</strong> en una tarjeta o <strong>arrástrenla</strong> para moverla entre la playa y el bote.</span>
+      </div>
+    </footer>
+  </main>
+
+  <!-- MODAL: CRISIS INESPERADA (+15 KG) -->
+  <div id="crisis-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border-2 border-red-500 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+      <div class="w-12 h-12 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl border border-red-500/40">
+        🚨
+      </div>
+      <h3 class="text-xl font-black text-center text-white tracking-wide">¡ALERTA DE PREFECTURA EN ALTAMAR!</h3>
+      <p class="text-center text-xs font-bold text-red-400 uppercase tracking-widest mt-1">Inspección Sorpresiva de Navegación</p>
+
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 my-4 text-xs text-slate-300 space-y-2">
+        <p>📻 <em>"Atención embarcación: por nueva disposición obligatoria de seguridad náutica inmediata, deben cargar a bordo la <strong>Batería Marina de Emergencia (+15 KG)</strong>."</em></p>
+        <div class="p-2.5 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center justify-between font-mono font-bold text-red-300">
+          <span>🔋 Batería Marina Obligatoria</span>
+          <span>+ 15 kg</span>
+        </div>
+        <p class="text-[11px] text-amber-300 font-medium">⚠️ La capacidad del bote <strong>SIGUE SIENDO DE 100 KG</strong>. Si no la suben, son retenidos; si la suben sin bajar nada, se hunden.</p>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button onclick="applyCrisisToAllTeams()" class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-lg shadow-red-600/30">
+          ⚡ Inyectar Tarjeta a Todas las Mesas
+        </button>
+        <button onclick="closeCrisisModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DEBRIEF Y CONEXIÓN CON RED LINK -->
+  <div id="debrief-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl font-bold">
+            🎓
+          </div>
+          <div>
+            <h3 class="text-base font-black text-white">DEBRIEF: ¿Cómo se traduce esto a Red Link?</h3>
+            <p class="text-xs text-slate-400">La conexión directa entre la barca y nuestro modelo de capacidad</p>
+          </div>
+        </div>
+        <button onclick="closeDebriefModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 my-5">
+        
+        <!-- Tarjeta 1: BAU -->
+        <div class="bg-slate-950 p-4 rounded-xl border-l-4 border-emerald-500 border-slate-800">
+          <div class="flex items-center justify-between text-xs font-bold">
+            <span class="text-emerald-400">💧 Agua y Alimentos (25 kg)</span>
+            <span class="bg-emerald-950 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-mono">1º PRIORIDAD</span>
+          </div>
+          <h4 class="text-sm font-black text-white mt-1">🟢 BAU (Continuidad Operativa)</h4>
+          <p class="text-xs text-slate-400 mt-1">
+            Mantiene la empresa viva día a día. Sin esto no hay servicio, se caen las transacciones y la nave no sobrevive. <strong>Es lo primero que se reserva y no se toca.</strong>
+          </p>
+        </div>
+
+        <!-- Tarjeta 2: Normativo -->
+        <div class="bg-slate-950 p-4 rounded-xl border-l-4 border-amber-500 border-slate-800">
+          <div class="flex items-center justify-between text-xs font-bold">
+            <span class="text-amber-400">🦺 Chalecos y Normas (25 kg)</span>
+            <span class="bg-amber-950 text-amber-300 text-[10px] px-2 py-0.5 rounded font-mono">2º PRIORIDAD</span>
+          </div>
+          <h4 class="text-sm font-black text-white mt-1">🟡 Normativos (BCRA / Regulaciones)</h4>
+          <p class="text-xs text-slate-400 mt-1">
+            Obligaciones legales y de seguridad que tienen fecha improrrogable impuesta por entes reguladores. No negociable.
+          </p>
+        </div>
+
+        <!-- Tarjeta 3: Estratégico -->
+        <div class="bg-slate-950 p-4 rounded-xl border-l-4 border-sky-500 border-slate-800">
+          <div class="flex items-center justify-between text-xs font-bold">
+            <span class="text-sky-400">🚤 Motor fuera de borda (35 kg)</span>
+            <span class="bg-sky-950 text-sky-300 text-[10px] px-2 py-0.5 rounded font-mono">3º PRIORIDAD</span>
+          </div>
+          <h4 class="text-sm font-black text-white mt-1">🔵 Estratégicos (OKRs / QBR)</h4>
+          <p class="text-xs text-slate-400 mt-1">
+            Lo que nos hace llegar a destino más rápido y ganar mercado. Se planifica sobre la capacidad disponible tras asegurar BAU y Normativos.
+          </p>
+        </div>
+
+        <!-- Tarjeta 4: Evolutivo -->
+        <div class="bg-slate-950 p-4 rounded-xl border-l-4 border-purple-500 border-slate-800">
+          <div class="flex items-center justify-between text-xs font-bold">
+            <span class="text-purple-400">🍻 Conservadora y Guitarra (20 kg)</span>
+            <span class="bg-purple-950 text-purple-300 text-[10px] px-2 py-0.5 rounded font-mono">4º PRIORIDAD / AMORTIGUADOR</span>
+          </div>
+          <h4 class="text-sm font-black text-white mt-1">🟣 Evolutivos (Mejoras y Deseos)</h4>
+          <p class="text-xs text-slate-400 mt-1">
+            Aportan confort y valor incremental, pero <strong>son la primera variable de ajuste</strong> cuando surge un normativo imprevisto o se sobrepasa la capacidad.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Conclusión de Liderazgo -->
+      <div class="p-4 bg-gradient-to-r from-blue-950/60 to-purple-950/60 border border-blue-500/30 rounded-xl text-xs text-slate-200">
+        <p class="font-bold text-blue-300 flex items-center gap-1.5 mb-1">
+          <i data-lucide="quote" class="w-4 h-4"></i> Conclusión Clave para Nuevos Líderes:
+        </p>
+        <p class="italic text-slate-300">
+          "Si la estrategia o un normativo exigen más capacidad de lo planificado, el impacto se absorbe reduciendo evolutivos y transparentando/conversando formalmente el impacto en los compromisos."
+        </p>
+      </div>
+
+      <div class="mt-5 flex justify-end">
+        <button onclick="closeDebriefModal()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition">
+          Entendido, volver al MURAL
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT: LÓGICA COMPLETA DE MURAL, TEAMS, DRAG & DROP Y AUDIO-FEEDBACK -->
+  <script>
+    // Definición de los Items Base
+    const BASE_ITEMS = [
+      {
+        id: 'bau-water',
+        title: 'Bidón de Agua + Alimentos',
+        subtitle: 'Sin esto no llegamos vivos a la costa.',
+        weight: 25,
+        category: 'bau',
+        bgColor: '#bbf7d0', // green
+        textColor: '#14532d',
+        tagColor: '#86efac',
+        icon: '💧',
+        typeLabel: 'VITAL (BAU)'
+      },
+      {
+        id: 'bau-meds',
+        title: 'Botiquín + Remedios Diarios',
+        subtitle: 'Insulina, antialérgicos y curaciones críticas.',
+        weight: 15,
+        category: 'bau',
+        bgColor: '#bbf7d0',
+        textColor: '#14532d',
+        tagColor: '#86efac',
+        icon: '🩹',
+        typeLabel: 'VITAL (BAU)'
+      },
+      {
+        id: 'norm-vests',
+        title: 'Chalecos Salvavidas + Bengalas',
+        subtitle: 'Exigido por Prefectura bajo apercibimiento de secuestro.',
+        weight: 25,
+        category: 'norm',
+        bgColor: '#fef08a', // yellow
+        textColor: '#713f12',
+        tagColor: '#fde047',
+        icon: '🦺',
+        typeLabel: 'LEGAL (NORMATIVO)'
+      },
+      {
+        id: 'norm-docs',
+        title: 'DNI, Pasaportes y Título Náutico',
+        subtitle: 'Documentación obligatoria de navegación para puerto.',
+        weight: 15,
+        category: 'norm',
+        bgColor: '#fef08a',
+        textColor: '#713f12',
+        tagColor: '#fde047',
+        icon: '📑',
+        typeLabel: 'LEGAL (NORMATIVO)'
+      },
+      {
+        id: 'strat-engine',
+        title: 'Motor Fuera de Borda + Combustible',
+        subtitle: 'Llegamos a destino en 1 hora en vez de remar 18 hs.',
+        weight: 35,
+        category: 'strat',
+        bgColor: '#bae6fd', // blue
+        textColor: '#0c4a6e',
+        tagColor: '#7dd3fc',
+        icon: '🚤',
+        typeLabel: 'ACELERACIÓN (ESTRATÉGICO)'
+      },
+      {
+        id: 'strat-laptops',
+        title: 'Notebooks + Teléfono Satelital',
+        subtitle: 'Contiene todo el trabajo del año y conexión.',
+        weight: 25,
+        category: 'strat',
+        bgColor: '#bae6fd',
+        textColor: '#0c4a6e',
+        tagColor: '#7dd3fc',
+        icon: '💻',
+        typeLabel: 'ACELERACIÓN (ESTRATÉGICO)'
+      },
+      {
+        id: 'evo-cooler',
+        title: 'Conservadora Fría + Guitarra',
+        subtitle: 'Para pasar el viaje con música y brindis.',
+        weight: 20,
+        category: 'evo',
+        bgColor: '#e9d5ff', // purple
+        textColor: '#581c87',
+        tagColor: '#d8b4fe',
+        icon: '🍻',
+        typeLabel: 'CONFORT (EVOLUTIVO)'
+      },
+      {
+        id: 'evo-luggage',
+        title: 'Valija de Fiesta + Zapatillas',
+        subtitle: 'La ropa comprada en el viaje para salir el finde.',
+        weight: 15,
+        category: 'evo',
+        bgColor: '#e9d5ff',
+        textColor: '#581c87',
+        tagColor: '#d8b4fe',
+        icon: '🧳',
+        typeLabel: 'CONFORT (EVOLUTIVO)'
+      }
+    ];
+
+    const CRISIS_ITEM = {
+      id: 'crisis-battery',
+      title: 'Batería Marina de Emergencia',
+      subtitle: 'Exigida de urgencia por Prefectura en Altamar.',
+      weight: 15,
+      category: 'norm-crisis',
+      bgColor: '#fecaca', // red
+      textColor: '#7f1d1d',
+      tagColor: '#fca5a5',
+      icon: '🔋',
+      typeLabel: '🚨 URGENCIA NORMATIVA'
+    };
+
+    // Estado independiente para cada una de las 4 mesas
+    let teamsState = {
+      mesa1: { name: 'Mesa 1', beach: JSON.parse(JSON.stringify(BASE_ITEMS)), boat: [] },
+      mesa2: { name: 'Mesa 2', beach: JSON.parse(JSON.stringify(BASE_ITEMS)), boat: [] },
+      mesa3: { name: 'Mesa 3', beach: JSON.parse(JSON.stringify(BASE_ITEMS)), boat: [] },
+      mesa4: { name: 'Mesa 4', beach: JSON.parse(JSON.stringify(BASE_ITEMS)), boat: [] },
+    };
+
+    let currentTeam = 'mesa1';
+    let draggedItemId = null;
+    let draggedFromZone = null;
+
+    // Inicialización al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderCurrentTeam();
+    });
+
+    // Cambiar de Mesa
+    function switchTeam(teamId) {
+      currentTeam = teamId;
+      document.querySelectorAll('.team-tab').forEach(tab => {
+        tab.className = 'team-tab px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white';
+      });
+      const activeTab = document.getElementById(`tab-${teamId}`);
+      if (activeTab) {
+        activeTab.className = 'team-tab px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white shadow-md';
+      }
+      document.getElementById('current-team-title').textContent = teamsState[teamId].name;
+      renderCurrentTeam();
+    }
+
+    // Renderizar las tarjetas de la mesa actual
+    function renderCurrentTeam() {
+      const state = teamsState[currentTeam];
+      const beachContainer = document.getElementById('beach-cards-container');
+      const boatContainer = document.getElementById('boat-cards-container');
+
+      beachContainer.innerHTML = '';
+      boatContainer.innerHTML = '';
+
+      // Renderizar en Playa
+      state.beach.forEach(item => {
+        beachContainer.appendChild(createStickyElement(item, 'beach'));
+      });
+
+      // Renderizar en Bote
+      state.boat.forEach(item => {
+        boatContainer.appendChild(createStickyElement(item, 'boat'));
+      });
+
+      // Actualizar Pesos y HUD
+      updateWeightCalculations();
+      lucide.createIcons();
+    }
+
+    // Crear elemento visual Post-it
+    function createStickyElement(item, currentZone) {
+      const card = document.createElement('div');
+      card.id = `card-${item.id}`;
+      card.className = `sticky-card p-3.5 rounded-xl border flex flex-col justify-between relative group cursor-pointer`;
+      card.style.backgroundColor = item.bgColor;
+      card.style.color = item.textColor;
+      card.style.borderColor = 'rgba(0,0,0,0.1)';
+      card.setAttribute('draggable', 'true');
+
+      // Drag events
+      card.ondragstart = (e) => handleDragStart(e, item.id, currentZone);
+      card.ondragend = handleDragEnd;
+
+      // Click to quick-move
+      card.onclick = () => moveItem(item.id, currentZone === 'beach' ? 'boat' : 'beach');
+
+      card.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between gap-1 mb-1.5">
+            <span class="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md" style="background-color: ${item.tagColor}; color: ${item.textColor};">
+              ${item.typeLabel}
+            </span>
+            <span class="text-xs font-mono font-black px-2 py-0.5 rounded-md bg-black/10">
+              ${item.weight} kg
+            </span>
+          </div>
+          <div class="flex items-start gap-2 mt-1">
+            <span class="text-xl leading-none">${item.icon}</span>
+            <div>
+              <h4 class="text-xs font-black leading-tight">${item.title}</h4>
+              <p class="text-[10px] font-medium leading-tight opacity-80 mt-0.5">${item.subtitle}</p>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 pt-2 border-t border-black/10 flex items-center justify-between text-[10px] font-bold opacity-70 group-hover:opacity-100">
+          <span>${currentZone === 'beach' ? '👉 Clic para subir al bote' : '👈 Clic para bajar a la playa'}</span>
+          <i data-lucide="${currentZone === 'beach' ? 'arrow-right' : 'arrow-left'}" class="w-3 h-3"></i>
+        </div>
+      `;
+
+      return card;
+    }
+
+    // Mover Item entre Playa y Bote
+    function moveItem(itemId, targetZone) {
+      const state = teamsState[currentTeam];
+      const sourceZone = targetZone === 'boat' ? 'beach' : 'boat';
+      
+      const itemIndex = state[sourceZone].findIndex(i => i.id === itemId);
+      if (itemIndex > -1) {
+        const [item] = state[sourceZone].splice(itemIndex, 1);
+        state[targetZone].push(item);
+        renderCurrentTeam();
+      }
+    }
+
+    // Drag and Drop Handlers
+    function handleDragStart(e, itemId, fromZone) {
+      draggedItemId = itemId;
+      draggedFromZone = fromZone;
+      e.dataTransfer.setData('text/plain', itemId);
+      e.currentTarget.style.opacity = '0.5';
+    }
+
+    function handleDragEnd(e) {
+      e.currentTarget.style.opacity = '1';
+      document.querySelectorAll('.drop-zone').forEach(el => el.classList.remove('drag-over'));
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDrop(e, targetZone) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (draggedItemId && draggedFromZone !== targetZone) {
+        moveItem(draggedItemId, targetZone);
+      }
+      draggedItemId = null;
+      draggedFromZone = null;
+    }
+
+    // Vaciar Bote
+    function clearBoat() {
+      const state = teamsState[currentTeam];
+      state.beach = [...state.beach, ...state.boat];
+      state.boat = [];
+      renderCurrentTeam();
+    }
+
+    // Cálculo y Actualización de Pesos
+    function updateWeightCalculations() {
+      const state = teamsState[currentTeam];
+      
+      const boatWeight = state.boat.reduce((acc, curr) => acc + curr.weight, 0);
+      const beachWeight = state.beach.reduce((acc, curr) => acc + curr.weight, 0);
+
+      document.getElementById('current-weight').textContent = boatWeight;
+      document.getElementById('beach-weight-pill').textContent = `${beachWeight} kg aquí`;
+      
+      const pct = Math.min(Math.round((boatWeight / 100) * 100), 100);
+      document.getElementById('weight-percentage').textContent = `${pct}%`;
+      
+      const progressBar = document.getElementById('weight-progress-bar');
+      progressBar.style.width = `${pct}%`;
+
+      const hudCard = document.getElementById('boat-hud-card');
+      const alertBanner = document.getElementById('boat-alert-banner');
+      const alertText = document.getElementById('boat-alert-text');
+      const alertTag = document.getElementById('boat-alert-tag');
+      const statusLabel = document.getElementById('weight-status-label');
+
+      // Estados de Capacidad
+      if (boatWeight === 100) {
+        // Óptimo perfecto
+        hudCard.className = 'bg-slate-950/90 border-2 border-emerald-500 rounded-xl px-5 py-3 flex items-center gap-6 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all';
+        progressBar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-300';
+        document.getElementById('current-weight').className = 'text-3xl font-black text-emerald-400 font-mono tracking-tight';
+        
+        alertBanner.className = 'mt-4 p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all bg-emerald-950/60 border-emerald-500 text-emerald-200';
+        alertText.innerHTML = '🎉 <strong>¡FLOTACIÓN ÓPTIMA!</strong> Capacidad de 100 kg alcanzada sin sobrecargar.';
+        alertTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-800 text-emerald-100';
+        alertTag.textContent = 'ESTADO: CAPACIDAD PERFECTA';
+        statusLabel.textContent = 'Capacidad Completa';
+        statusLabel.className = 'text-emerald-400';
+
+        // Disparar confetti sutil
+        confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+
+      } else if (boatWeight > 100) {
+        // Sobrecarga / Hundimiento
+        hudCard.className = 'bg-slate-950/90 border-2 border-red-500 rounded-xl px-5 py-3 flex items-center gap-6 overload-glow transition-all';
+        progressBar.className = 'h-full bg-red-600 rounded-full transition-all duration-300';
+        document.getElementById('current-weight').className = 'text-3xl font-black text-red-400 font-mono tracking-tight';
+
+        const excess = boatWeight - 100;
+        alertBanner.className = 'mt-4 p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all bg-red-950/80 border-red-500 text-red-200 animate-pulse';
+        alertText.innerHTML = `⚠️ <strong>¡EL BOTE SE HUNDE!</strong> Exceso de <strong>+${excess} kg</strong>. Deben bajar elementos.`;
+        alertTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-red-800 text-red-100 font-black';
+        alertTag.textContent = `SOBRECARGA: +${excess} KG`;
+        statusLabel.textContent = '¡SOBRECARGADO!';
+        statusLabel.className = 'text-red-400 font-black';
+
+      } else {
+        // Aún con espacio libre
+        hudCard.className = 'bg-slate-950/90 border-2 border-slate-700 rounded-xl px-5 py-3 flex items-center gap-6 transition-all';
+        progressBar.className = 'h-full bg-blue-500 rounded-full transition-all duration-300';
+        document.getElementById('current-weight').className = 'text-3xl font-black text-blue-400 font-mono tracking-tight';
+
+        const free = 100 - boatWeight;
+        alertBanner.className = 'mt-4 p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all bg-slate-950 border-slate-800 text-slate-300';
+        alertText.innerHTML = `Quedan <strong class="text-blue-400">${free} kg</strong> de capacidad disponible en el bote.`;
+        alertTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300';
+        alertTag.textContent = `DISPONIBLE: ${free} KG`;
+        statusLabel.textContent = 'Capacidad Libre';
+        statusLabel.className = 'text-slate-400';
+      }
+    }
+
+    // Inyectar Crisis a Todas las Mesas
+    function triggerCrisisModal() {
+      document.getElementById('crisis-modal').classList.remove('hidden');
+    }
+    function closeCrisisModal() {
+      document.getElementById('crisis-modal').classList.add('hidden');
+    }
+
+    function applyCrisisToAllTeams() {
+      Object.keys(teamsState).forEach(teamKey => {
+        const team = teamsState[teamKey];
+        const exists = team.beach.some(i => i.id === CRISIS_ITEM.id) || team.boat.some(i => i.id === CRISIS_ITEM.id);
+        if (!exists) {
+          team.beach.unshift(JSON.parse(JSON.stringify(CRISIS_ITEM)));
+        }
+      });
+      closeCrisisModal();
+      renderCurrentTeam();
+      alert("🚨 ¡Crisis Inyectada! La tarjeta 'Batería Marina (+15 kg)' fue añadida a la playa de todas las mesas.");
+    }
+
+    // Modales de Debrief
+    function openDebriefModal() {
+      document.getElementById('debrief-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+    function closeDebriefModal() {
+      document.getElementById('debrief-modal').classList.add('hidden');
+    }
+
+    // Temporizador de 7 Minutos
+    let timerDuration = 7 * 60;
+    let timerInterval = null;
+    let isRunning = false;
+
+    function toggleTimer() {
+      if (isRunning) {
+        clearInterval(timerInterval);
+        isRunning = false;
+        document.getElementById('timer-icon').setAttribute('data-lucide', 'play');
+      } else {
+        isRunning = true;
+        document.getElementById('timer-icon').setAttribute('data-lucide', 'pause');
+        timerInterval = setInterval(() => {
+          if (timerDuration <= 0) {
+            clearInterval(timerInterval);
+            isRunning = false;
+            alert("⏰ ¡TIEMPO CUMPLIDO! Manos arriba, revisemos qué decidió cada mesa.");
+            return;
+          }
+          timerDuration--;
+          updateTimerDisplay();
+        }, 1000);
+      }
+      lucide.createIcons();
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      isRunning = false;
+      timerDuration = 7 * 60;
+      updateTimerDisplay();
+      document.getElementById('timer-icon').setAttribute('data-lucide', 'play');
+      lucide.createIcons();
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timerDuration / 60).toString().padStart(2, '0');
+      const seconds = (timerDuration % 60).toString().padStart(2, '0');
+      document.getElementById('timer-display').textContent = `${minutes}:${seconds}`;
+    }
+  </script>
+</body>
+</html>
