@@ -803,6 +803,18 @@
       const seconds = (timerDuration % 60).toString().padStart(2, '0');
       document.getElementById('timer-display').textContent = `${minutes}:${seconds}`;
     }
+    //conexión entre mural original y collab.js
+     window.BASE_ITEMS = BASE_ITEMS;
+    window.CRISIS_ITEM = CRISIS_ITEM;
+    window.teamsState = teamsState;
+  Object.defineProperty(window, "currentTeam", {
+    get: () => currentTeam
+  });
   </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="./config.js"></script>
+    <script src="./collab.js"></script>
+ 
+
 </body>
 </html>
